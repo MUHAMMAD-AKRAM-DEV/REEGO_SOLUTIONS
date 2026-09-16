@@ -48,6 +48,28 @@ async function main() {
     );
   }
 
+  // Seeding a remote database with only DATABASE_URL overridden silently falls
+  // back to the local .env.local for these two, which is how a placeholder
+  // credential ends up on a live system. Refuse rather than do that quietly.
+  const isPlaceholder =
+    email === "admin@agency.local" ||
+    password === "change-me-before-anyone-logs-in";
+
+  const looksRemote =
+    !!process.env.DATABASE_URL &&
+    !/localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL);
+
+  if (isPlaceholder && looksRemote) {
+    throw new Error(
+      "Refusing to seed a placeholder administrator into a remote database.\n\n" +
+        `  email:    ${email}\n` +
+        "  password: the .env.example placeholder\n\n" +
+        "Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD for this run, e.g.\n" +
+        '  $env:SEED_ADMIN_EMAIL="you@example.com"\n' +
+        '  $env:SEED_ADMIN_PASSWORD="<a real password>"\n',
+    );
+  }
+
   const admin = await db.user.upsert({
     where: { email },
     update: {},
