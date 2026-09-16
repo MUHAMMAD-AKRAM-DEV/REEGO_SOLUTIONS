@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Uploaded documents - never commit PHI
 .uploads/
+
+# Editor scratch files
+.vscode/
