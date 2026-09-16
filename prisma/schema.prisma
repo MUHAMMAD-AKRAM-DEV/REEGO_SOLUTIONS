@@ -1,0 +1,635 @@
+// Billing agency operations platform — Phase 00
+//
+// Scope of this file: authentication, role-based access, the append-only audit
+// log, and the client / provider / payer registry. Claims, documents, work
+// queues and credentialing arrive in later phases; enums and relations here are
+// shaped so those tables attach without a rewrite.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7 takes the connection URL from prisma.config.ts for CLI commands,
+// and from the driver adapter passed to PrismaClient at runtime.
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+/// Staff roles inside the agency, plus the external client-portal role.
+/// Ordered loosely from most to least privileged.
+enum UserRole {
+  ADMIN
+  MANAGER
+  TEAM_LEAD
+  CREDENTIALING_SPECIALIST
+  BILLER
+  AR_CALLER
+  QA_AUDITOR
+  CLIENT_USER
+}
+
+enum ClientStatus {
+  PROSPECT
+  ONBOARDING
+  ACTIVE
+  PAUSED
+  OFFBOARDED
+}
+
+enum ProviderType {
+  MD
+  DO
+  NP
+  PA
+  DPM
+  DC
+  DDS
+  DPT
+  PSYD
+  OTHER
+}
+
+/// What the agency has contracted to do for a given client. A client can have
+/// several concurrent engagements.
+enum ServiceLine {
+  CHARGE_ENTRY
+  PAYMENT_POSTING
+  AR_FOLLOW_UP
+  DENIAL_MANAGEMENT
+  CODING
+  CREDENTIALING
+  PAYER_ENROLLMENT
+  PATIENT_STATEMENTS
+}
+
+/// Every action worth reconstructing later. READ is deliberately included:
+/// under HIPAA, who *looked* at PHI matters as much as who changed it.
+enum AuditAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  LOGIN
+  LOGIN_FAILED
+  LOGOUT
+  EXPORT
+  PERMISSION_CHANGE
+}
+
+// ---------------------------------------------------------------------------
+// Identity and access
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  role         UserRole @default(BILLER)
+  isActive     Boolean  @default(true)
+
+  /// Base32 TOTP secret. Null until the user completes MFA enrolment.
+  mfaSecret     String?
+  mfaEnrolledAt DateTime?
+
+  /// Set for CLIENT_USER accounts, which may only ever see this one client.
+  /// Null for agency staff, whose reach is governed by role.
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  lastLoginAt       DateTime?
+  failedLoginCount  Int       @default(0)
+  lockedUntil       DateTime?
+
+  sessions  Session[]
+  auditLogs AuditLog[]
+  documents Document[]
+  assignedWork WorkItem[] @relation("AssignedWork")
+  createdWork  WorkItem[] @relation("CreatedWork")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([role])
+}
+
+model Session {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// SHA-256 of the session token. The raw token exists only in the user's
+  /// cookie, so a database leak does not hand over live sessions.
+  tokenHash String @unique
+
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// Audit log — append-only
+// ---------------------------------------------------------------------------
+
+/// Never updated, never deleted by application code. No `updatedAt` field is
+/// present by design; a migration in a later phase adds a database-level
+/// revoke of UPDATE and DELETE on this table for the application role.
+model AuditLog {
+  id String @id @default(cuid())
+
+  /// Null only for actions with no authenticated actor, such as a failed login
+  /// against an address that does not exist.
+  actorId String?
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  action AuditAction
+
+  /// Model name and primary key of the row touched, kept as loose strings so
+  /// the log survives tables being added or renamed.
+  entityType String
+  entityId   String?
+
+  /// Denormalised so "everything anyone did to this client" stays one index
+  /// scan, and so the row still answers that question after the entity is gone.
+  clientId String?
+
+  /// Human-readable, written for whoever reads this during an audit.
+  summary String
+
+  /// Changed fields, request context, before/after where it is safe to keep.
+  /// Never put raw PHI in here.
+  metadata Json?
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+  @@index([clientId, createdAt])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Registry — clients, locations, providers, payers
+// ---------------------------------------------------------------------------
+
+/// A practice or medical group the agency bills for.
+model Client {
+  id       String       @id @default(cuid())
+  name     String
+  legalName String?
+  status   ClientStatus @default(PROSPECT)
+
+  /// Group-level NPI (type 2). Individual providers carry their own type 1 NPI.
+  groupNpi String?
+
+  /// Sensitive. Encrypt at the application layer before storing — a later
+  /// phase moves this behind the same helper used for other identifiers.
+  taxIdEncrypted String?
+
+  primaryContactName  String?
+  primaryContactEmail String?
+  primaryContactPhone String?
+
+  /// Where the agency's staff go to do the actual claim work, e.g. the name of
+  /// the client's practice-management system. Credentials are never stored
+  /// here — this is a pointer, not a vault.
+  pmSystemName String?
+  pmSystemUrl  String?
+
+  onboardedAt DateTime?
+  offboardedAt DateTime?
+  notes       String?
+
+  locations   Location[]
+  providers   Provider[]
+  engagements Engagement[]
+  portalUsers User[]
+  documents   Document[]
+  workItems   WorkItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([name])
+}
+
+model Location {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  name         String
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  postalCode   String?
+  phone        String?
+
+  /// Service-facility NPI, where the location bills under its own.
+  npi String?
+
+  /// CMS place-of-service code, e.g. "11" office, "21" inpatient hospital.
+  placeOfServiceCode String?
+
+  isActive Boolean @default(true)
+
+  providers   Provider[]
+  enrollments PayerEnrollment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+}
+
+/// An individual rendering provider. Not unique on NPI: the same physician can
+/// legitimately appear under two different client practices, and each of those
+/// relationships is credentialed and enrolled separately.
+model Provider {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  firstName  String
+  lastName   String
+  middleName String?
+
+  /// Displayed suffix, e.g. "MD", "DO", "NP". Kept separate from providerType
+  /// so the printed form matches what the provider actually uses.
+  credentialSuffix String?
+  providerType     ProviderType @default(OTHER)
+
+  /// Individual (type 1) NPI.
+  npi String?
+
+  /// Primary taxonomy code, e.g. "207Q00000X" family medicine.
+  taxonomyCode String?
+  specialty    String?
+
+  email String?
+  phone String?
+
+  primaryLocationId String?
+  primaryLocation   Location? @relation(fields: [primaryLocationId], references: [id], onDelete: SetNull)
+
+  /// CAQH ProView provider ID. The attestation itself is tracked as a
+  /// CredentialItem, because what matters operationally is its expiry.
+  caqhProviderId String?
+
+  startDate DateTime?
+  endDate   DateTime?
+  isActive  Boolean   @default(true)
+
+  credentials CredentialItem[]
+  enrollments PayerEnrollment[]
+  documents   Document[]
+  workItems   WorkItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([npi])
+  @@index([lastName, firstName])
+}
+
+/// Insurance payers, shared across all clients rather than duplicated per
+/// client, so denial trends aggregate correctly.
+model Payer {
+  id   String @id @default(cuid())
+  name String @unique
+
+  /// Payer ID used for electronic submission, where one applies.
+  payerCode String?
+
+  /// e.g. "Medicare", "Medicaid", "Commercial", "Workers Comp".
+  planType String?
+
+  phone            String?
+  providerPortalUrl String?
+  notes            String?
+
+  isActive Boolean @default(true)
+
+  enrollments PayerEnrollment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([planType])
+}
+
+/// One contracted service line for one client, with the turnaround the agency
+/// has committed to. Work-queue SLAs in phase 03 read their targets from here.
+model Engagement {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  service ServiceLine
+
+  /// Agreed turnaround in business days for items in this service line.
+  slaDays Int?
+
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clientId, service])
+  @@index([clientId])
+}
+
+// ===========================================================================
+// Phase 01 — Documents
+// ===========================================================================
+
+enum DocumentCategory {
+  SUPERBILL
+  EOB
+  ERA
+  PAYER_CORRESPONDENCE
+  APPEAL
+  CONTRACT
+  W9
+  STATE_LICENSE
+  DEA_CERTIFICATE
+  MALPRACTICE_COI
+  BOARD_CERTIFICATE
+  DIPLOMA
+  CV
+  OTHER
+}
+
+/// A stored file. Superseded documents are kept and chained through
+/// `replacesId`, because "what did the certificate say last year" is a real
+/// question during an audit.
+model Document {
+  id       String           @id @default(cuid())
+  category DocumentCategory
+  title    String
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  providerId String?
+  provider   Provider? @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  /// Original filename as uploaded, for download. Never used as a storage path.
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+
+  /// Opaque key for the storage driver — a path on disk today, an S3 object
+  /// key in production. Callers never build this themselves.
+  storageKey String
+
+  version    Int     @default(1)
+  replacesId String? @unique
+  replaces   Document? @relation("DocumentVersions", fields: [replacesId], references: [id], onDelete: SetNull)
+  replacedBy Document? @relation("DocumentVersions")
+
+  notes String?
+
+  uploadedById String?
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  credentialItems CredentialItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId, category])
+  @@index([providerId, category])
+  @@index([createdAt])
+}
+
+// ===========================================================================
+// Phase 02 — Credentialing and payer enrollment
+// ===========================================================================
+
+enum CredentialType {
+  STATE_LICENSE
+  DEA_REGISTRATION
+  CDS_REGISTRATION
+  BOARD_CERTIFICATION
+  MALPRACTICE_COVERAGE
+  CAQH_ATTESTATION
+  BLS_ACLS
+  NPDB_QUERY
+  IMMUNIZATION
+  OTHER
+}
+
+/// Anything with an expiry date attached to a provider. One table rather than
+/// one per credential type, because the question that matters is always the
+/// same: what lapses next, and for whom.
+model CredentialItem {
+  id         String         @id @default(cuid())
+  providerId String
+  provider   Provider       @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  type       CredentialType
+
+  /// Licence number, DEA number, certificate number.
+  identifier String?
+  /// Board, state medical board, carrier, registry.
+  issuingAuthority String?
+  /// Two-letter state where the credential is state-scoped.
+  state String?
+
+  issuedAt  DateTime?
+  expiresAt DateTime?
+
+  /// Set when the item is superseded or intentionally retired, so it drops out
+  /// of the expirables view without being deleted.
+  retiredAt DateTime?
+
+  documentId String?
+  document   Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId, type])
+  @@index([expiresAt])
+  @@index([retiredAt, expiresAt])
+}
+
+enum EnrollmentStatus {
+  NOT_STARTED
+  PREPARING
+  SUBMITTED
+  UNDER_REVIEW
+  INFO_REQUESTED
+  APPROVED
+  EFFECTIVE
+  DENIED
+  REVALIDATION_DUE
+  TERMINATED
+}
+
+/// One provider's enrollment with one payer, optionally at one location.
+/// This is where the money is: an un-enrolled provider cannot be billed for.
+model PayerEnrollment {
+  id String @id @default(cuid())
+
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  payerId String
+  payer   Payer  @relation(fields: [payerId], references: [id], onDelete: Cascade)
+
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  status EnrollmentStatus @default(NOT_STARTED)
+
+  submittedAt DateTime?
+  approvedAt  DateTime?
+  effectiveAt DateTime?
+
+  /// Medicare revalidates every five years; Medicaid varies by state.
+  revalidationDueAt DateTime?
+
+  /// When to chase the payer next. Drives the follow-up worklist.
+  followUpAt DateTime?
+
+  /// PTAN, payer-issued provider number, or group number.
+  issuedProviderId String?
+
+  /// Payer's own reference for the application.
+  submissionReference String?
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workItems WorkItem[]
+
+  @@unique([providerId, payerId, locationId])
+  @@index([status])
+  @@index([followUpAt])
+  @@index([revalidationDueAt])
+  @@index([payerId, status])
+}
+
+// ===========================================================================
+// Phase 03 — Work queues
+// ===========================================================================
+
+enum WorkItemStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_PAYER
+  WAITING_ON_CLIENT
+  BLOCKED
+  DONE
+  CANCELLED
+}
+
+enum WorkItemPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+/// Accounts-receivable aging buckets. The industry works in these, so the
+/// system stores the bucket rather than making everyone recompute it.
+enum ArBucket {
+  AGE_0_30
+  AGE_31_60
+  AGE_61_90
+  AGE_91_120
+  AGE_120_PLUS
+}
+
+model WorkQueue {
+  id          String  @id @default(cuid())
+  key         String  @unique
+  name        String
+  description String?
+
+  service ServiceLine?
+
+  /// Default turnaround in business days for items landing in this queue.
+  defaultSlaDays Int?
+
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  items WorkItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WorkItem {
+  id      String    @id @default(cuid())
+  queueId String
+  queue   WorkQueue @relation(fields: [queueId], references: [id], onDelete: Cascade)
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  providerId String?
+  provider   Provider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  payerEnrollmentId String?
+  payerEnrollment   PayerEnrollment? @relation(fields: [payerEnrollmentId], references: [id], onDelete: SetNull)
+
+  title       String
+  description String?
+
+  status   WorkItemStatus   @default(OPEN)
+  priority WorkItemPriority @default(NORMAL)
+
+  assigneeId String?
+  assignee   User?   @relation("AssignedWork", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  /// AR and denial work carries claim context; credentialing work does not.
+  arBucket    ArBucket?
+  claimRef    String?
+  amountCents Int?
+  /// CARC/RARC denial code as the payer returned it.
+  denialCode  String?
+
+  dueAt       DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  createdById String?
+  createdBy   User?   @relation("CreatedWork", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([queueId, status])
+  @@index([assigneeId, status])
+  @@index([clientId, status])
+  @@index([dueAt])
+  @@index([status, priority])
+}
