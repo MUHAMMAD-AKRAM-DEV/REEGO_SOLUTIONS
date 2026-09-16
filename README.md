@@ -1,6 +1,6 @@
-# Billing Agency Operations Platform
+# REEGO_SOLUTIONS
 
-Centralized operations platform for a 50-person medical billing agency, replacing
+**Billing Agency Operations Platform** — centralized operations platform for a 50-person medical billing agency, replacing
 Microsoft Excel as the coordination layer for billing work and provider
 credentialing.
 
