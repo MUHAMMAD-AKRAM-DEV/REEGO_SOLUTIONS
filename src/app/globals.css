@@ -1,26 +1,154 @@
 @import "tailwindcss";
 
+/*
+  Palette carries over from the build proposal so the product and the document
+  read as one system. Verdigris is the accent and is never used to mean
+  severity — red, ochre and green do that, and in this product colour meaning
+  severity is load-bearing, not decorative.
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --ground: #eef1f1;
+  --surface: #ffffff;
+  --surface-2: #e6ebea;
+  --surface-3: #dfe5e4;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --ink: #15201f;
+  --ink-2: #33413f;
+  --muted: #5f6e6c;
+  --faint: #8a9795;
+
+  --line: #d7dedd;
+  --line-soft: #e4e9e8;
+
+  --accent: #0d5f5a;
+  --accent-ink: #0a4b47;
+  --accent-soft: #dceceb;
+  --on-accent: #ffffff;
+
+  /* Branded surfaces (the sign-in panel) hold their colour in both themes —
+     a brand slab that inverts to bright mint on a dark ground glares. */
+  --brand: #0d5f5a;
+  --brand-ink: #ffffff;
+
+  --crit: #a3232a;
+  --crit-soft: #f7e4e4;
+  --warn: #8a5c0d;
+  --warn-soft: #f7eeda;
+  --ok: #2e6b46;
+  --ok-soft: #e3efe8;
+  --info: #1f5673;
+  --info-soft: #e0ebf1;
+
+  --focus: #0d8f86;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --ground: #0c1211;
+    --surface: #141d1c;
+    --surface-2: #1a2524;
+    --surface-3: #222f2d;
+
+    --ink: #e7edec;
+    --ink-2: #c5d1cf;
+    --muted: #94a5a3;
+    --faint: #6d7d7b;
+
+    --line: #27332f;
+    --line-soft: #1d2827;
+
+    --accent: #57bcb0;
+    --accent-ink: #7fd2c7;
+    --accent-soft: #16302d;
+    --on-accent: #06201e;
+
+    --brand: #0a4a46;
+    --brand-ink: #eaf5f3;
+
+    --crit: #ea8087;
+    --crit-soft: #341a1c;
+    --warn: #d9a441;
+    --warn-soft: #332715;
+    --ok: #68bd8c;
+    --ok-soft: #162c21;
+    --info: #74b3d4;
+    --info-soft: #14262f;
+
+    --focus: #6fd3c7;
   }
 }
 
+@theme inline {
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+
+  --color-crit: var(--crit);
+  --color-crit-soft: var(--crit-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  --font-sans: var(--font-plex-sans), "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, Consolas, monospace;
+  --font-serif: var(--font-plex-serif), Georgia, serif;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Visible keyboard focus everywhere, without painting focus rings on clicks. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Uppercase micro-labels: column heads, eyebrows, metadata keys. */
+.label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Identifiers, dates and counts — anything a person scans down a column. */
+.figure {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
