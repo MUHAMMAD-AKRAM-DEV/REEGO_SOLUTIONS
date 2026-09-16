@@ -4,6 +4,10 @@
 FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
+# The postinstall hook runs `prisma generate`, which needs the schema to exist
+# before `npm ci` runs — hence copying it alongside the manifests rather than
+# with the rest of the source.
+COPY prisma ./prisma
 RUN npm ci
 
 FROM node:24-alpine AS builder
