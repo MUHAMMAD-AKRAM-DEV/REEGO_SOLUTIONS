@@ -14,8 +14,8 @@ FROM node:24-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# The Prisma client is generated from the schema, not committed.
-RUN npx prisma generate
+# No `prisma generate` here: the postinstall hook already generated the client
+# in the deps stage, and that node_modules is copied in above.
 RUN npm run build
 
 FROM node:24-alpine AS runner
