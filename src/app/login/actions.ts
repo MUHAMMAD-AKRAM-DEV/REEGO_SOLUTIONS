@@ -100,6 +100,15 @@ function databaseErrorMessage(error: unknown): string {
       ? String((error as { code: unknown }).code)
       : "";
 
+  // In development the fix is a command the reader can run. In production the
+  // reader is a biller looking at a sign-in screen, and telling them to run
+  // `npm run db:init` is both useless and a description of our internals.
+  const isDevelopment = process.env.NODE_ENV === "development";
+
+  if (!isDevelopment) {
+    return "Sign-in is temporarily unavailable. This has been logged — please tell your administrator, and try again shortly.";
+  }
+
   switch (code) {
     case "P1000":
       return "The database rejected our credentials. Run `npm run db:init` to create the application role, then `npm run db:migrate`.";
