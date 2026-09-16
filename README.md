@@ -9,6 +9,10 @@ work claims inside each client's own practice-management system. This platform
 deliberately does **not** do charge entry, coding, claim scrubbing, EDI 837
 submission, ERA posting, or patient statements.
 
+**[USER-GUIDE.md](USER-GUIDE.md)** — how the agency's staff use the system.
+**[DEPLOYMENT.md](DEPLOYMENT.md)** — how to run it, and what is still outstanding
+before real patient data goes in.
+
 Full proposal, including phasing and open questions:
 <https://claude.ai/code/artifact/7f48f2b8-c63f-4263-8825-afdbe305a6c8>
 
