@@ -2,16 +2,20 @@ import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 
 import {
+  Countdown,
   EmptyState,
   PageHeader,
   Panel,
   Pill,
   Stat,
+  StatStrip,
   TableWrap,
+  buttonClass,
   stripeClass,
 } from "@/components/ui";
 import {
-  FilterChips,
+  FilterBar,
+  FilterSelect,
   Pagination,
   SearchBox,
   SortTh,
@@ -160,7 +164,7 @@ export default async function QueuesPage({
         actions={
           <Link
             href="/queues/new"
-            className="inline-flex rounded-[3px] bg-accent px-3.5 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent-ink"
+            className={buttonClass("primary")}
           >
             Add work item
           </Link>
@@ -168,60 +172,70 @@ export default async function QueuesPage({
       />
 
       <Panel title="Load">
-        <div className="flex flex-wrap gap-x-8 gap-y-6 px-4 py-5">
-          <Stat label="Open" value={openCount} hint="Not yet done" />
+        <StatStrip>
+          <Stat label="Open" value={openCount} share={1} hint="Not yet done" />
           <Stat
             label="Overdue"
             value={overdueCount}
             severity={overdueCount > 0 ? "critical" : "neutral"}
+            share={openCount === 0 ? 0 : overdueCount / openCount}
             hint="Past turnaround"
           />
           <Stat
             label="Unassigned"
             value={unassigned}
             severity={unassigned > 0 ? "warning" : "neutral"}
+            share={openCount === 0 ? 0 : unassigned / openCount}
             hint="Nobody owns these"
           />
-          <Stat label="Assigned to you" value={mineCount} severity="info" />
-        </div>
+          <Stat
+            label="Assigned to you"
+            value={mineCount}
+            severity="info"
+            share={openCount === 0 ? 0 : mineCount / openCount}
+          />
+        </StatStrip>
       </Panel>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-4">
-          {queues.length > 0 ? (
-            <FilterChips
-              paramName="queue"
-              options={queues.map((queue) => ({ value: queue.id, label: queue.name }))}
-              basePath={BASE}
-              query={query}
-            />
-          ) : null}
-          <FilterChips
-            paramName="status"
-            options={Object.entries(WORK_STATUS_LABEL).map(([value, label]) => ({
-              value,
-              label,
-            }))}
+      <FilterBar>
+        {queues.length > 0 ? (
+          <FilterSelect
+            paramName="queue"
+            label="Queue"
+            options={queues.map((queue) => ({ value: queue.id, label: queue.name }))}
             basePath={BASE}
             query={query}
           />
-        </div>
-        <SearchBox placeholder="Title, claim ref, denial code…" />
-      </div>
-
-      <div className="flex flex-wrap gap-4">
-        <FilterChips
+        ) : null}
+        <FilterSelect
+          paramName="status"
+          label="Status"
+          allLabel="Open work"
+          options={Object.entries(WORK_STATUS_LABEL).map(([value, label]) => ({
+            value,
+            label,
+          }))}
+          basePath={BASE}
+          query={query}
+        />
+        <FilterSelect
           paramName="assignee"
+          label="Owner"
+          allLabel="Anyone"
           options={[
             { value: user.id, label: "Mine" },
             { value: "unassigned", label: "Unassigned" },
-            ...staff.map((person) => ({ value: person.id, label: person.fullName })),
+            // Excluding self: "Mine" above already covers this person.
+            ...staff
+              .filter((person) => person.id !== user.id)
+              .map((person) => ({ value: person.id, label: person.fullName })),
           ]}
           basePath={BASE}
           query={query}
         />
-        <FilterChips
+        <FilterSelect
           paramName="bucket"
+          label="AR age"
           options={Object.entries(AR_BUCKET_LABEL).map(([value, label]) => ({
             value,
             label: `${label} days`,
@@ -230,14 +244,16 @@ export default async function QueuesPage({
           query={query}
         />
         {clients.length > 1 ? (
-          <FilterChips
+          <FilterSelect
             paramName="client"
+            label="Client"
             options={clients.map((client) => ({ value: client.id, label: client.name }))}
             basePath={BASE}
             query={query}
           />
         ) : null}
-      </div>
+        <SearchBox placeholder="Title, claim, denial code…" />
+      </FilterBar>
 
       <Panel title="Items">
         {items.length === 0 ? (
@@ -247,7 +263,7 @@ export default async function QueuesPage({
             action={
               <Link
                 href="/queues/new"
-                className="inline-flex rounded-[3px] bg-accent px-3.5 py-2 text-sm font-medium text-on-accent hover:bg-accent-ink"
+                className={buttonClass("primary")}
               >
                 Add work item
               </Link>
@@ -296,7 +312,7 @@ export default async function QueuesPage({
                     return (
                       <tr
                         key={item.id}
-                        className="border-b border-line-soft transition-colors last:border-b-0 hover:bg-surface-2"
+                        className="row-hover border-b border-line-soft last:border-b-0 hover:bg-surface-2"
                       >
                         <td className={`px-4 py-3 ${stripeClass(severity)}`}>
                           <Link
@@ -341,15 +357,22 @@ export default async function QueuesPage({
                             <span className="text-warn">Unassigned</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <td className="px-4 py-3">
                           {item.dueAt ? (
-                            <Pill severity={expirySeverity(dueDays)}>
-                              {overdue
-                                ? `${Math.abs(dueDays!)}d late`
-                                : formatDate(item.dueAt)}
-                            </Pill>
+                            <span className="flex justify-end">
+                              <Countdown
+                                days={dueDays}
+                                severity={expirySeverity(dueDays)}
+                                horizon={30}
+                                label={
+                                  overdue
+                                    ? `${Math.abs(dueDays!)}d late`
+                                    : formatDate(item.dueAt)
+                                }
+                              />
+                            </span>
                           ) : (
-                            <span className="text-muted">—</span>
+                            <span className="block text-right text-muted">—</span>
                           )}
                         </td>
                       </tr>

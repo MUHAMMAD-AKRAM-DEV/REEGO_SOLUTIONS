@@ -10,7 +10,8 @@ import {
   stripeClass,
 } from "@/components/ui";
 import {
-  FilterChips,
+  FilterBar,
+  FilterSelect,
   Pagination,
   SearchBox,
   SortTh,
@@ -126,9 +127,10 @@ export default async function DocumentsPage({
         />
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <FilterChips
+      <FilterBar>
+        <FilterSelect
           paramName="category"
+          label="Category"
           options={Object.entries(DOCUMENT_LABEL).map(([value, label]) => ({
             value,
             label,
@@ -136,17 +138,17 @@ export default async function DocumentsPage({
           basePath={BASE}
           query={query}
         />
+        {clients.length > 1 ? (
+          <FilterSelect
+            paramName="client"
+            label="Client"
+            options={clients.map((client) => ({ value: client.id, label: client.name }))}
+            basePath={BASE}
+            query={query}
+          />
+        ) : null}
         <SearchBox placeholder="Title, filename, notes…" />
-      </div>
-
-      {clients.length > 1 ? (
-        <FilterChips
-          paramName="client"
-          options={clients.map((client) => ({ value: client.id, label: client.name }))}
-          basePath={BASE}
-          query={query}
-        />
-      ) : null}
+      </FilterBar>
 
       <Panel
         title="Filed documents"
@@ -192,7 +194,7 @@ export default async function DocumentsPage({
                   {documents.map((document) => (
                     <tr
                       key={document.id}
-                      className="border-b border-line-soft transition-colors last:border-b-0 hover:bg-surface-2"
+                      className="row-hover border-b border-line-soft last:border-b-0 hover:bg-surface-2"
                     >
                       <td className={`px-4 py-3 ${stripeClass("neutral")}`}>
                         <a

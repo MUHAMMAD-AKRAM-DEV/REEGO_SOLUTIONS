@@ -1,80 +1,116 @@
 @import "tailwindcss";
 
 /*
-  Palette carries over from the build proposal so the product and the document
-  read as one system. Verdigris is the accent and is never used to mean
-  severity — red, ochre and green do that, and in this product colour meaning
-  severity is load-bearing, not decorative.
+  Palette: deep verdigris on a warm-leaning green-grey paper.
+
+  Two rules hold the whole system together:
+    - The accent never means urgency. Red, ochre and green mean severity and
+      nothing else, because in this product colour carries real information.
+    - Elevation is spent, not sprinkled. Only surfaces that genuinely float
+      get a shadow; everything else separates with a hairline.
 */
 :root {
-  --ground: #eef1f1;
+  /* Grounds and surfaces */
+  --ground: #edefee;
   --surface: #ffffff;
-  --surface-2: #e6ebea;
-  --surface-3: #dfe5e4;
+  --surface-2: #f3f5f4;
+  --surface-3: #e7ebea;
+  --surface-sunk: #e4e8e7;
 
-  --ink: #15201f;
-  --ink-2: #33413f;
-  --muted: #5f6e6c;
-  --faint: #8a9795;
+  /* Ink, four steps so hierarchy is possible */
+  --ink: #101b1a;
+  --ink-2: #2d3b39;
+  --muted: #5b6a68;
+  --faint: #8d9a98;
 
-  --line: #d7dedd;
-  --line-soft: #e4e9e8;
+  --line: #d4dcda;
+  --line-soft: #e5eae9;
+  --line-strong: #b9c5c3;
 
-  --accent: #0d5f5a;
-  --accent-ink: #0a4b47;
-  --accent-soft: #dceceb;
+  /* Accent — deepened, with a brighter step for interactive emphasis */
+  --accent: #0a5951;
+  --accent-bright: #0f7d71;
+  --accent-ink: #084741;
+  --accent-soft: #dceae8;
+  --accent-softer: #eef5f4;
   --on-accent: #ffffff;
 
-  /* Branded surfaces (the sign-in panel) hold their colour in both themes —
-     a brand slab that inverts to bright mint on a dark ground glares. */
-  --brand: #0d5f5a;
+  /* Brand surfaces hold their colour in both themes */
+  --brand: #0a5951;
   --brand-ink: #ffffff;
 
-  --crit: #a3232a;
-  --crit-soft: #f7e4e4;
-  --warn: #8a5c0d;
-  --warn-soft: #f7eeda;
-  --ok: #2e6b46;
-  --ok-soft: #e3efe8;
-  --info: #1f5673;
-  --info-soft: #e0ebf1;
+  /* Severity */
+  --crit: #9e2129;
+  --crit-bright: #c4323b;
+  --crit-soft: #f8e3e4;
+  --warn: #855508;
+  --warn-bright: #b8770f;
+  --warn-soft: #f9eeda;
+  --ok: #2a6642;
+  --ok-bright: #3c8a5b;
+  --ok-soft: #e2efe8;
+  --info: #1c5270;
+  --info-bright: #2a7099;
+  --info-soft: #e0ecf2;
 
-  --focus: #0d8f86;
+  --focus: #0f8f82;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgb(16 27 26 / 0.05), 0 1px 1px rgb(16 27 26 / 0.03);
+  --shadow-md:
+    0 1px 3px rgb(16 27 26 / 0.06), 0 4px 12px -2px rgb(16 27 26 / 0.07);
+  --shadow-lg:
+    0 2px 4px rgb(16 27 26 / 0.05), 0 12px 28px -6px rgb(16 27 26 / 0.12);
+
+  --radius: 5px;
+  --radius-lg: 7px;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --ground: #0c1211;
-    --surface: #141d1c;
-    --surface-2: #1a2524;
-    --surface-3: #222f2d;
+  :root:not([data-theme="light"]) {
+    --ground: #0b1211;
+    --surface: #131c1b;
+    --surface-2: #182221;
+    --surface-3: #202b2a;
+    --surface-sunk: #0e1716;
 
-    --ink: #e7edec;
-    --ink-2: #c5d1cf;
-    --muted: #94a5a3;
-    --faint: #6d7d7b;
+    --ink: #e9efee;
+    --ink-2: #c8d4d2;
+    --muted: #93a3a1;
+    --faint: #6b7a78;
 
-    --line: #27332f;
-    --line-soft: #1d2827;
+    --line: #26332f;
+    --line-soft: #1c2726;
+    --line-strong: #34433f;
 
-    --accent: #57bcb0;
-    --accent-ink: #7fd2c7;
-    --accent-soft: #16302d;
-    --on-accent: #06201e;
+    --accent: #4fb5a8;
+    --accent-bright: #6ecdc0;
+    --accent-ink: #8adbcf;
+    --accent-soft: #15302d;
+    --accent-softer: #111f1e;
+    --on-accent: #052320;
 
-    --brand: #0a4a46;
-    --brand-ink: #eaf5f3;
+    --brand: #0a4a44;
+    --brand-ink: #e9f5f3;
 
-    --crit: #ea8087;
-    --crit-soft: #341a1c;
-    --warn: #d9a441;
-    --warn-soft: #332715;
-    --ok: #68bd8c;
-    --ok-soft: #162c21;
-    --info: #74b3d4;
-    --info-soft: #14262f;
+    --crit: #e8787f;
+    --crit-bright: #f0949a;
+    --crit-soft: #331a1c;
+    --warn: #d6a342;
+    --warn-bright: #e5b95f;
+    --warn-soft: #322614;
+    --ok: #63bb88;
+    --ok-bright: #7fcc9e;
+    --ok-soft: #152b20;
+    --info: #6fb0d2;
+    --info-bright: #8cc4e0;
+    --info-soft: #13252e;
 
-    --focus: #6fd3c7;
+    --focus: #6ad3c5;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-md: 0 1px 3px rgb(0 0 0 / 0.35), 0 4px 12px -2px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 12px 28px -6px rgb(0 0 0 / 0.5);
   }
 }
 
@@ -83,6 +119,7 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
+  --color-surface-sunk: var(--surface-sunk);
 
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
@@ -91,22 +128,36 @@
 
   --color-line: var(--line);
   --color-line-soft: var(--line-soft);
+  --color-line-strong: var(--line-strong);
 
   --color-accent: var(--accent);
+  --color-accent-bright: var(--accent-bright);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-softer: var(--accent-softer);
   --color-on-accent: var(--on-accent);
   --color-brand: var(--brand);
   --color-brand-ink: var(--brand-ink);
 
   --color-crit: var(--crit);
+  --color-crit-bright: var(--crit-bright);
   --color-crit-soft: var(--crit-soft);
   --color-warn: var(--warn);
+  --color-warn-bright: var(--warn-bright);
   --color-warn-soft: var(--warn-soft);
   --color-ok: var(--ok);
+  --color-ok-bright: var(--ok-bright);
   --color-ok-soft: var(--ok-soft);
   --color-info: var(--info);
+  --color-info-bright: var(--info-bright);
   --color-info-soft: var(--info-soft);
+
+  --shadow-panel: var(--shadow-sm);
+  --shadow-raised: var(--shadow-md);
+  --shadow-float: var(--shadow-lg);
+
+  --radius-card: var(--radius);
+  --radius-panel: var(--radius-lg);
 
   --font-sans: var(--font-plex-sans), "Segoe UI", Helvetica, Arial, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, Consolas, monospace;
@@ -118,13 +169,13 @@ body {
   color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* Visible keyboard focus everywhere, without painting focus rings on clicks. */
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 3px;
 }
 
 /* Uppercase micro-labels: column heads, eyebrows, metadata keys. */
@@ -132,15 +183,67 @@ body {
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   font-weight: 600;
-  letter-spacing: 0.11em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
-/* Identifiers, dates and counts — anything a person scans down a column. */
+/* Identifiers, dates and counts — anything scanned down a column. */
 .figure {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "zero" 1;
+}
+
+/*
+  The runway meter.
+
+  A deadline is easier to judge as a shrinking length than as a number, so
+  every countdown in the product draws one: full when there is time, a sliver
+  when there is not, and an overrun mark once the date has passed. The width
+  is set inline from real days remaining.
+*/
+.runway {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 3.5rem;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--surface-sunk);
+  overflow: hidden;
+}
+.runway > span {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/*
+  An overdue item has no runway left, so a solid full bar would read as
+  "plenty of room" — the same shape a comfortable deadline draws. Hatching it
+  says overrun instead, and says it without relying on colour alone.
+*/
+.runway-overrun {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    currentColor 0 2px,
+    transparent 2px 4px
+  );
+}
+@media (prefers-reduced-motion: reduce) {
+  .runway > span {
+    transition: none;
+  }
+}
+
+/* Table rows lift very slightly on hover rather than changing colour hard. */
+.row-hover {
+  transition:
+    background-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {

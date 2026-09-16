@@ -2,16 +2,20 @@ import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 
 import {
+  Countdown,
   EmptyState,
   PageHeader,
   Panel,
   Pill,
   Stat,
+  StatStrip,
   TableWrap,
+  buttonClass,
   stripeClass,
 } from "@/components/ui";
 import {
-  FilterChips,
+  FilterBar,
+  FilterSelect,
   Pagination,
   SearchBox,
   SortTh,
@@ -156,7 +160,7 @@ export default async function EnrollmentPage({
         actions={
           <Link
             href="/enrollment/new"
-            className="inline-flex rounded-[3px] bg-accent px-3.5 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent-ink"
+            className={buttonClass("primary")}
           >
             Add enrollment
           </Link>
@@ -164,27 +168,36 @@ export default async function EnrollmentPage({
       />
 
       <Panel title="Pipeline">
-        <div className="flex flex-wrap gap-x-8 gap-y-6 px-4 py-5">
+        <StatStrip>
           <Stat
             label="Billable"
             value={effective}
             severity={effective > 0 ? "ok" : "neutral"}
+            share={total === 0 ? 0 : effective / total}
             hint="Approved or effective"
           />
-          <Stat label="In flight" value={inFlight} severity="info" hint="With the payer" />
+          <Stat
+            label="In flight"
+            value={inFlight}
+            severity="info"
+            share={total === 0 ? 0 : inFlight / total}
+            hint="With the payer"
+          />
           <Stat
             label="Needs attention"
             value={needsAttention}
             severity={needsAttention > 0 ? "critical" : "neutral"}
+            share={total === 0 ? 0 : needsAttention / total}
             hint="Info requested, denied, or follow-up due"
           />
           <Stat label="Matching" value={total} hint="Current filters" />
-        </div>
+        </StatStrip>
       </Panel>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <FilterChips
+      <FilterBar>
+        <FilterSelect
           paramName="status"
+          label="Status"
           options={Object.entries(ENROLLMENT_LABEL).map(([value, label]) => ({
             value,
             label,
@@ -192,19 +205,17 @@ export default async function EnrollmentPage({
           basePath={BASE}
           query={query}
         />
-        <SearchBox placeholder="Provider, payer, PTAN…" />
-      </div>
-
-      <div className="flex flex-wrap gap-4">
-        <FilterChips
+        <FilterSelect
           paramName="payer"
+          label="Payer"
           options={payers.map((payer) => ({ value: payer.id, label: payer.name }))}
           basePath={BASE}
           query={query}
         />
         {clients.length > 1 ? (
-          <FilterChips
+          <FilterSelect
             paramName="client"
+            label="Practice"
             options={clients.map((client) => ({
               value: client.id,
               label: client.name,
@@ -213,7 +224,8 @@ export default async function EnrollmentPage({
             query={query}
           />
         ) : null}
-      </div>
+        <SearchBox placeholder="Provider, payer, PTAN…" />
+      </FilterBar>
 
       <Panel title="Enrollments">
         {rows.length === 0 ? (
@@ -223,7 +235,7 @@ export default async function EnrollmentPage({
             action={
               <Link
                 href="/enrollment/new"
-                className="inline-flex rounded-[3px] bg-accent px-3.5 py-2 text-sm font-medium text-on-accent hover:bg-accent-ink"
+                className={buttonClass("primary")}
               >
                 Add enrollment
               </Link>
@@ -270,7 +282,7 @@ export default async function EnrollmentPage({
                     return (
                       <tr
                         key={row.id}
-                        className="border-b border-line-soft transition-colors last:border-b-0 hover:bg-surface-2"
+                        className="row-hover border-b border-line-soft last:border-b-0 hover:bg-surface-2"
                       >
                         <td className={`px-4 py-3 ${stripeClass(severity)}`}>
                           <Link
@@ -311,15 +323,22 @@ export default async function EnrollmentPage({
                         <td className="figure px-4 py-3 whitespace-nowrap text-muted">
                           {row.issuedProviderId ?? "—"}
                         </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <td className="px-4 py-3">
                           {row.followUpAt ? (
-                            <Pill severity={expirySeverity(followDays)}>
-                              {followDays !== null && followDays < 0
-                                ? `${Math.abs(followDays)}d late`
-                                : formatDate(row.followUpAt)}
-                            </Pill>
+                            <span className="flex justify-end">
+                              <Countdown
+                                days={followDays}
+                                severity={expirySeverity(followDays)}
+                                horizon={60}
+                                label={
+                                  followDays !== null && followDays < 0
+                                    ? `${Math.abs(followDays)}d late`
+                                    : formatDate(row.followUpAt)
+                                }
+                              />
+                            </span>
                           ) : (
-                            <span className="text-muted">—</span>
+                            <span className="block text-right text-muted">—</span>
                           )}
                         </td>
                       </tr>
